@@ -15,9 +15,13 @@ Automatically remove confirmed malicious files
 Log every action for audit and incident review
 
 📐 Architecture Overview
+
 [ Wazuh Agent ]
+
   └─ File Integrity Monitoring (syscheck)
+  
         ↓
+        
 [ Wazuh Manager ]
 
   ├─ VirusTotal API integration
@@ -33,7 +37,8 @@ Log every action for audit and incident review
   └─ remove-threat.sh deletes the malicious file
 
 📦 Repository Contents
-.
+
+
 ├── README.md
 
 ├── install_manager_vt_ar.sh    # Manager setup (VirusTotal + Active Response)
