@@ -5,11 +5,18 @@ set -euo pipefail
 # Usage:
 #   sudo bash install_agent_fim_ar.sh --monitor "/tmp" --monitor "/home" --monitor "/var/www"
 # Defaults if no --monitor is given: /tmp and /home
+#
+# Works in two modes:
+#  1) Running from a cloned repo (expects ./remove-threat.sh in current directory)
+#  2) Running via curl|bash (downloads remove-threat.sh from GitHub Raw)
 
 OSSEC_CONF="/var/ossec/etc/ossec.conf"
 AR_BIN_DIR="/var/ossec/active-response/bin"
 AR_SCRIPT_NAME="remove-threat.sh"
 AR_SCRIPT_PATH="${AR_BIN_DIR}/${AR_SCRIPT_NAME}"
+
+# GitHub Raw base (update if repo name/branch changes)
+RAW_BASE="https://raw.githubusercontent.com/garciarubenjr/wazuh-vt-active-response/main"
 
 declare -a MONITOR_DIRS=()
 
@@ -97,9 +104,17 @@ install_remove_script() {
 
   install -d -m 0750 -o root -g wazuh "${AR_BIN_DIR}"
 
-  local src
-  src="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/active-response/${AR_SCRIPT_NAME}"
-  [[ -f "${src}" ]] || die "Missing ${src}. Keep the repo structure."
+  # Prefer local file (cloned repo use-case)
+  local src="./${AR_SCRIPT_NAME}"
+
+  # If not present (curl|bash use-case), download from GitHub Raw
+  if [[ ! -f "${src}" ]]; then
+    info "${AR_SCRIPT_NAME} not found locally; downloading from GitHub..."
+    curl -fsSL "${RAW_BASE}/${AR_SCRIPT_NAME}" -o "${src}"
+  fi
+
+  # Basic sanity check
+  grep -q "remove-threat" "${src}" || info "Note: ${src} did not match expected content string (continuing anyway)."
 
   cp -f "${src}" "${AR_SCRIPT_PATH}"
   chown root:wazuh "${AR_SCRIPT_PATH}"
