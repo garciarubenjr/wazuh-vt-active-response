@@ -1,25 +1,44 @@
 # wazuh-vt-active-response
 
-Add this to your README.md (copy/paste)
-One-command install
-Manager
+🔑 Getting a VirusTotal API Key
+
+Before installing the manager integration, you need a VirusTotal API key.
+
+Steps
+
+Go to https://www.virustotal.com
+
+Create an account or log in
+
+Click your profile icon (top right)
+
+Select API key
+
+Copy your API key
+
+A free VirusTotal account is sufficient for lab and testing purposes.
+
+Using the API Key
+
+The API key is provided at install time when running the manager script:
+
 sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/garciarubenjr/wazuh-vt-active-response/main/install_manager_vt_ar.sh)" -- \
   --vt-key "YOUR_VIRUSTOTAL_API_KEY"
 
-Agent
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/garciarubenjr/wazuh-vt-active-response/main/install_agent_fim_ar.sh)" -- \
-  --monitor "/tmp" --monitor "/home"
+Important Notes
 
+The API key is configured on the Wazuh manager only
 
-The VirusTotal API key is configured on the manager only and is not stored in this repo.
+The key is written to /var/ossec/etc/ossec.conf
 
-Quick check: are your agent scripts already “self-contained”?
+The key is not stored in this repository
 
-Open your install_agent_fim_ar.sh and confirm it downloads/copies remove-threat.sh into:
+Agents do not have access to the VirusTotal API
 
-/var/ossec/active-response/bin/remove-threat.sh
+This follows best practices for centralized threat-intelligence integrations.
 
+🔐 API Key Security Recommendation
 
-If it doesn’t, add the curl snippet I gave above and commit it — that’s the #1 thing that makes onboarding new servers painless.
+Do not hardcode your API key into scripts or commit it to GitHub.
 
-If you paste your current install_agent_fim_ar.sh contents here, I’ll point out the exact spot to add the download block (and any tiny fixes so it’s idempotent).
+If needed, you can also pass it temporarily via shell history-safe methods (e.g., copy/paste at runtime).
