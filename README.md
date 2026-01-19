@@ -19,18 +19,27 @@ Log every action for audit and incident review
   └─ File Integrity Monitoring (syscheck)
         ↓
 [ Wazuh Manager ]
+
   ├─ VirusTotal API integration
+  
   ├─ Rule 87105 (malicious verdict)
+  
   └─ Active Response trigger
+  
         ↓
+        
 [ Wazuh Agent ]
+
   └─ remove-threat.sh deletes the malicious file
 
 📦 Repository Contents
 .
 ├── README.md
+
 ├── install_manager_vt_ar.sh    # Manager setup (VirusTotal + Active Response)
+
 ├── install_agent_fim_ar.sh     # Agent setup (FIM + AR install)
+
 └── remove-threat.sh            # Active Response script (auto-delete)
 
 ⚠️ Important Security Notes
@@ -97,13 +106,13 @@ sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/garciarubenjr/wazuh
 
 What this does:
 
-Enables File Integrity Monitoring (FIM)
+-Enables File Integrity Monitoring (FIM)
 
-Adds realtime monitored directories
+-Adds realtime monitored directories
 
-Installs the Active Response delete script
+-Installs the Active Response delete script
 
-Restarts the Wazuh agent
+-Restarts the Wazuh agent
 
 If no --monitor flags are provided, the script defaults to /tmp and /home.
 
@@ -111,20 +120,20 @@ If no --monitor flags are provided, the script defaults to /tmp and /home.
 
 On the agent, run:
 
-sudo mkdir -p /tmp/malware
-sudo curl https://secure.eicar.org/eicar.com -o /tmp/malware/eicar
+-sudo mkdir -p /tmp/malware
+-sudo curl https://secure.eicar.org/eicar.com -o /tmp/malware/eicar
 
 Expected behavior
 
-File is detected by FIM
+-File is detected by FIM
 
-VirusTotal flags it as malicious
+-VirusTotal flags it as malicious
 
-Active Response deletes the file automatically
+-Active Response deletes the file automatically
 
 Verify deletion:
 
-sudo tail -n 50 /var/ossec/logs/active-responses.log
+-sudo tail -n 50 /var/ossec/logs/active-responses.log
 
 
 You should see:
@@ -133,27 +142,27 @@ SUCCESS: deleted /tmp/malware/eicar
 
 🔍 Verification & Troubleshooting
 Agent logs
-sudo tail -n 100 /var/ossec/logs/ossec.log
-sudo tail -n 100 /var/ossec/logs/active-responses.log
+-sudo tail -n 100 /var/ossec/logs/ossec.log
+-sudo tail -n 100 /var/ossec/logs/active-responses.log
 
 Manager logs
-sudo tail -n 100 /var/ossec/logs/integrations.log
-sudo tail -n 200 /var/ossec/logs/alerts/alerts.json | grep 87105
+-sudo tail -n 100 /var/ossec/logs/integrations.log
+-sudo tail -n 200 /var/ossec/logs/alerts/alerts.json | grep 87105
 
 🧠 How This Scales
 
 This setup is designed for reuse:
 
-New VM → run one command
+-New VM → run one command
 
-Ideal for:
+-Ideal for:
 
-Honeypots
+---Honeypots
 
-DMZ web servers
+---DMZ web servers
 
-SOC labs
+---SOC labs
 
-Malware collection environments
+---Malware collection environments
 
 No additional manager configuration is needed once VirusTotal is enabled
