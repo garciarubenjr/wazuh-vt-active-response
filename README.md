@@ -1,175 +1,584 @@
-# 🛡️ wazuh-vt-active-response
+# Wazuh + VirusTotal Active Response & Threat Quarantine
 
-Automated **Wazuh File Integrity Monitoring (FIM)** with **VirusTotal validation** and **Active Response (auto-delete)**.
+A defensive security automation project that combines **Wazuh File Integrity Monitoring (FIM)**, **VirusTotal enrichment**, and **Wazuh Active Response** to detect suspicious files, evaluate them using threat intelligence, and automatically move confirmed threats into a protected quarantine location for analyst review.
 
-This project enables onboarding new Linux servers with **a single command** and automatically:
-
-- Detect file changes using Wazuh FIM
-- Validate suspicious files with VirusTotal
-- Automatically remove confirmed malicious files
-- Log all actions for auditing and incident review
+> The project prioritizes **containment and evidence preservation over automatic deletion**.
 
 ---
 
-## 📐 Architecture Overview
+## Project Objectives
 
-[ Wazuh Agent ]
+The goal of this project is to demonstrate an automated endpoint detection and response workflow using Wazuh.
 
-└─ File Integrity Monitoring (syscheck)
+The workflow focuses on:
 
-↓
-
-[ Wazuh Manager ]
-
-├─ VirusTotal API integration
-
-├─ Rule 87105 (malicious verdict)
-
-└─ Active Response trigger
-
-↓
-
-[ Wazuh Agent ]
-
-└─ remove-threat.sh deletes the malicious file
-
+- Monitoring selected Linux directories with Wazuh FIM
+- Detecting newly created or modified files
+- Enriching file alerts through VirusTotal
+- Triggering Wazuh Active Response after a configured malicious-file rule fires
+- Validating the target path before taking action
+- Quarantining the suspicious file rather than deleting it
+- Calculating and preserving a SHA-256 hash
+- Recording file metadata for analyst review
+- Maintaining an auditable Active Response log
+- Protecting the VirusTotal API key from source-code exposure
 
 ---
 
-## 📦 Repository Contents
+## Skills Demonstrated
+
+- Wazuh File Integrity Monitoring
+- Wazuh Active Response
+- VirusTotal API integration
+- Linux security automation
+- Bash scripting
+- Threat-intelligence enrichment
+- Endpoint detection and response concepts
+- Evidence preservation
+- Secure configuration management
+- Automated containment
+- Defensive scripting
+- SOC workflow design
+
+---
+
+## Architecture
+
+The project uses a manager-side enrichment workflow and an agent-side containment workflow.
 
 ```text
-.
+Monitored Linux Endpoint
+        |
+        | File Created / Modified
+        v
+Wazuh File Integrity Monitoring
+        |
+        | FIM Alert
+        v
+Wazuh Manager
+        |
+        | VirusTotal Enrichment
+        v
+Configured Malicious-File Rule
+        |
+        | Active Response
+        v
+Affected Wazuh Agent
+        |
+        | Validate Path / Rule / File
+        | Calculate SHA-256
+        | Preserve Metadata
+        v
+Protected Quarantine
+        |
+        v
+Analyst Review
+```
+
+The endpoint does **not** communicate directly with VirusTotal.
+
+VirusTotal enrichment occurs on the Wazuh manager, which then instructs the affected endpoint to execute the Active Response locally.
+
+---
+
+## Response Philosophy
+
+The original version of this project automatically deleted files after a malicious VirusTotal verdict.
+
+The current design instead uses:
+
+**Detect → Enrich → Validate → Quarantine → Preserve → Review**
+
+This provides several advantages:
+
+- Suspicious files remain available for forensic analysis
+- SHA-256 hashes are preserved
+- Original file paths are recorded
+- Response actions remain auditable
+- False-positive recovery is possible
+- Destructive remediation is not performed automatically
+
+---
+
+## Repository Structure
+
+```text
+wazuh-vt-active-response/
 ├── README.md
-├── install_manager_vt_ar.sh    # Manager setup (VirusTotal + Active Response)
-├── install_agent_fim_ar.sh     # Agent setup (FIM + AR install)
-└── remove-threat.sh            # Active Response script (auto-delete)
+└── scripts/
+    ├── install-agent-fim.sh
+    ├── install-manager-virustotal.sh
+    └── quarantine-threat.sh
+```
 
-⚠️ Important Security Notes
+### Script Roles
 
-    VirusTotal API key is configured on the manager only
+| Script | Purpose |
+|---|---|
+| `install-manager-virustotal.sh` | Configures VirusTotal integration and manager-side Active Response |
+| `install-agent-fim.sh` | Configures FIM directories and installs the response script on an endpoint |
+| `quarantine-threat.sh` | Validates and quarantines a suspicious file while preserving evidence |
 
-    The API key is never stored in this repository
+---
 
-    Agents do not communicate directly with VirusTotal
+# Security Workflow
 
-    Active Response deletes files — use carefully in production environments
+## 1. File Integrity Monitoring
 
-🔑 Getting a VirusTotal API Key
+The Wazuh agent monitors explicitly selected directories.
 
-Before installing the manager integration, you need a VirusTotal API key.
-Steps
+Example monitored locations may include:
 
-    Go to https://www.virustotal.com
+- `/tmp`
+- `/var/tmp`
+- `/var/www`
+- Selected application directories
 
-    Create an account or log in
+The installer intentionally avoids enabling broad monitoring of the entire filesystem by default.
 
-    Click your profile icon (top right)
+---
 
-    Select API key
+## 2. VirusTotal Enrichment
 
-    Copy your API key
+When Wazuh FIM detects a relevant file event, the manager can submit the file hash to the configured VirusTotal integration.
 
-    A free VirusTotal account is sufficient for lab and testing purposes.
+VirusTotal enrichment occurs centrally on the manager.
 
-🚀 Quick Start
-1️⃣ Wazuh Manager (run once)
+The API key is **not stored in this GitHub repository**.
 
-Run this on the Wazuh manager:
+---
 
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/garciarubenjr/wazuh-vt-active-response/main/install_manager_vt_ar.sh)" -- \
-  --vt-key "YOUR_VIRUSTOTAL_API_KEY"
+## 3. Active Response
 
-What this does:
+When the configured Wazuh malicious-file rule fires, the manager triggers:
 
-    Adds VirusTotal integration
+```text
+quarantine-threat
+```
 
-    Enables Active Response for rule 87105
+The response is executed locally on the affected endpoint.
 
-    Restarts the Wazuh manager
+The default lab rule is:
 
-API Key Notes
+```text
+87105
+```
 
-    The API key is written to /var/ossec/etc/ossec.conf
+The rule ID is configurable because Wazuh rules and environments may differ.
 
-    The key is not stored in this repository
+---
 
-    Agents do not have access to the VirusTotal API
+## 4. Threat Validation
 
-This follows best practices for centralized threat-intelligence integrations.
-🔐 API Key Security Recommendation
+Before moving a file, `quarantine-threat.sh` performs several safety checks.
 
-Do not hardcode your API key into scripts or commit it to GitHub.
+The response verifies:
 
-Always pass it at runtime, as shown above.
-2️⃣ Wazuh Agent (run on each server)
+- The Active Response payload is valid JSON
+- The action is an expected response action
+- The configured rule triggered the response
+- A structured file path exists in the alert
+- The path is absolute
+- The target is not a symbolic link
+- The target is a regular file
+- The resolved path falls within an approved monitoring root
 
-Run this on every Wazuh agent you want protected:
+The script does not attempt to extract arbitrary file paths from unstructured log messages.
 
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/garciarubenjr/wazuh-vt-active-response/main/install_agent_fim_ar.sh)" -- \
-  --monitor "/tmp" \
-  --monitor "/home"
+---
 
-What this does:
+## 5. Evidence Preservation
 
-    Enables File Integrity Monitoring (FIM)
+Before quarantine, the response collects information about the target file.
 
-    Adds realtime monitored directories
+Preserved evidence includes:
 
-    Installs the Active Response delete script
+- Original file path
+- Quarantine path
+- SHA-256 hash
+- File size
+- Original owner/group
+- Wazuh rule ID
+- Response timestamp
 
-    Restarts the Wazuh agent
+Metadata is written alongside the quarantined file.
 
-    If no --monitor flags are provided, the script defaults to /tmp and /home.
+Example:
 
-🧪 Test the Setup (EICAR)
+```text
+/var/ossec/quarantine/
+├── 20260908T120000Z_<SHA256>_suspicious-file
+└── 20260908T120000Z_<SHA256>_suspicious-file.json
+```
 
-On the agent, run:
+---
 
+## 6. Quarantine
+
+Confirmed files are moved into:
+
+```text
+/var/ossec/quarantine
+```
+
+The quarantine directory and its contents are restricted to protect the preserved evidence.
+
+The file is **not automatically destroyed**.
+
+An analyst can inspect the evidence and determine the appropriate remediation action.
+
+---
+
+# Installation
+
+## Requirements
+
+This lab assumes:
+
+- Wazuh Manager installed
+- Wazuh Agent installed on monitored endpoints
+- Debian/Ubuntu-based systems for automatic dependency installation
+- Root or `sudo` privileges
+- VirusTotal API key
+- Network access required for VirusTotal integration
+
+Clone the repository:
+
+```bash
+git clone https://github.com/garciarubenjr/wazuh-vt-active-response.git
+cd wazuh-vt-active-response
+```
+
+> Review security scripts before executing them in your environment.
+
+---
+
+# Manager Configuration
+
+Run the manager installer on the **Wazuh Manager**:
+
+```bash
+sudo bash scripts/install-manager-virustotal.sh
+```
+
+The script securely prompts for the VirusTotal API key without placing the key directly in the command line.
+
+Alternatively, the key can be supplied through the environment:
+
+```bash
+sudo env VT_API_KEY="YOUR_API_KEY" \
+  bash scripts/install-manager-virustotal.sh
+```
+
+The manager installer:
+
+- Validates the Wazuh manager installation
+- Creates a timestamped backup of `ossec.conf`
+- Configures VirusTotal integration
+- Configures the `quarantine-threat` Active Response
+- Validates the XML configuration
+- Restores the backup if validation fails
+- Restarts the Wazuh manager
+- Rolls back if the manager cannot restart successfully
+
+---
+
+## VirusTotal API Key Security
+
+The VirusTotal API key is written to the local Wazuh manager configuration as required by the integration.
+
+Do **not** commit:
+
+```text
+/var/ossec/etc/ossec.conf
+```
+
+or any file containing the API key to GitHub.
+
+The project does not hardcode the API key into its scripts.
+
+---
+
+# Agent Configuration
+
+Run the agent installer on each Linux endpoint that should participate in the workflow.
+
+Example:
+
+```bash
+sudo bash scripts/install-agent-fim.sh \
+  --monitor /tmp \
+  --monitor /var/www
+```
+
+If no `--monitor` option is specified, the script defaults to:
+
+```text
+/tmp
+```
+
+The installer:
+
+- Validates the Wazuh agent installation
+- Validates monitored directories
+- Creates a timestamped configuration backup
+- Configures File Integrity Monitoring
+- Enables realtime monitoring
+- Validates `ossec.conf`
+- Installs `quarantine-threat.sh`
+- Applies restrictive permissions
+- Restarts the Wazuh agent
+- Rolls back the configuration if restart fails
+
+---
+
+# Validation with EICAR
+
+The harmless **EICAR anti-malware test file** can be used to validate the detection pipeline in a controlled lab.
+
+Create a test directory:
+
+```bash
 sudo mkdir -p /tmp/malware
-sudo curl https://secure.eicar.org/eicar.com -o /tmp/malware/eicar
+```
 
-Expected behavior
+Download the EICAR test file:
 
-    File is detected by FIM
+```bash
+sudo curl https://secure.eicar.org/eicar.com \
+  -o /tmp/malware/eicar
+```
 
-    VirusTotal flags it as malicious
+Expected workflow:
 
-    Active Response deletes the file automatically
+```text
+EICAR File Created
+        ↓
+Wazuh FIM Detects Change
+        ↓
+VirusTotal Enrichment
+        ↓
+Malicious-File Rule Fires
+        ↓
+Active Response
+        ↓
+File Quarantined
+        ↓
+Metadata + SHA-256 Preserved
+```
 
-Verify deletion:
+---
 
-sudo tail -n 50 /var/ossec/logs/active-responses.log
+## Verify FIM Activity
 
-You should see:
+On the monitored endpoint:
 
-SUCCESS: deleted /tmp/malware/eicar
-
-🔍 Verification & Troubleshooting
-Agent logs
-
+```bash
 sudo tail -n 100 /var/ossec/logs/ossec.log
+```
+
+---
+
+## Verify Active Response
+
+```bash
 sudo tail -n 100 /var/ossec/logs/active-responses.log
+```
 
-Manager logs
+A successful response should indicate that the target was moved into quarantine.
 
+---
+
+## Inspect Quarantine
+
+```bash
+sudo ls -lah /var/ossec/quarantine
+```
+
+The directory should contain both:
+
+- The quarantined file
+- A corresponding JSON metadata file
+
+---
+
+## Verify VirusTotal Integration
+
+On the Wazuh manager:
+
+```bash
 sudo tail -n 100 /var/ossec/logs/integrations.log
-sudo tail -n 200 /var/ossec/logs/alerts/alerts.json | grep 87105
+```
 
-🧠 How This Scales
+Relevant Wazuh alerts can also be reviewed in:
 
-This setup is designed for reuse:
+```text
+/var/ossec/logs/alerts/alerts.json
+```
 
-    New VM → run one command
+---
 
-    Ideal for:
+# Security Safeguards
 
-        Honeypots
+This project includes several controls designed to reduce the risk of unsafe automated remediation.
 
-        DMZ web servers
+### Quarantine Instead of Delete
 
-        SOC labs
+Files are preserved rather than permanently removed.
 
-        Malware collection environments
+### Path Allowlisting
 
-No additional manager configuration is required once VirusTotal is enabled.
+The response only acts on files located under explicitly approved root directories.
+
+### Symlink Protection
+
+Symbolic links are rejected to reduce the risk of redirecting the response toward unintended files.
+
+### Structured Alert Parsing
+
+The script relies on structured Wazuh alert fields rather than scraping arbitrary paths from log text.
+
+### Rule Validation
+
+The response can verify that the expected malicious-file rule triggered the action.
+
+### File Hashing
+
+SHA-256 is calculated before quarantine for evidence tracking and future analysis.
+
+### Metadata Preservation
+
+File origin and response information are recorded before containment.
+
+### Configuration Backups
+
+Both installers create timestamped Wazuh configuration backups before making changes.
+
+### XML Validation
+
+Configuration files are checked before services are restarted.
+
+### Automatic Rollback
+
+If configuration validation or service restart fails, the previous configuration can be restored.
+
+---
+
+# Monitoring Guidance
+
+Monitoring directories should be selected intentionally.
+
+Large or frequently changing paths can generate excessive FIM events.
+
+For example, monitoring all of:
+
+```text
+/home
+```
+
+with realtime change reporting may produce unnecessary telemetry in a busy environment.
+
+A better approach is to monitor security-relevant locations based on the role of the endpoint.
+
+Examples:
+
+```text
+/tmp
+/var/tmp
+/var/www
+/opt/application/uploads
+```
+
+---
+
+# Detection Engineering Considerations
+
+A VirusTotal result alone should not automatically be interpreted as proof of compromise.
+
+A mature workflow may consider:
+
+- Number of malicious detections
+- File reputation
+- File prevalence
+- Digital signature information
+- File origin
+- User context
+- Process ancestry
+- Endpoint role
+- Related alerts
+- Threat-intelligence confidence
+
+Future versions of this project may introduce configurable response thresholds before quarantine occurs.
+
+---
+
+# Operational Limitations
+
+This project is designed primarily for controlled security labs and defensive research.
+
+Current limitations include:
+
+- Automatic dependency installation is designed for Debian/Ubuntu systems
+- VirusTotal API limits depend on the user's account
+- Wazuh rule IDs may differ between versions and environments
+- Production environments may require custom FIM exclusions
+- Production response logic should be tested carefully before automated containment is enabled
+- Quarantine restoration is currently a manual analyst process
+
+---
+
+# Future Enhancements
+
+Planned improvements include:
+
+- Dedicated quarantine restore utility
+- Configurable VirusTotal detection thresholds
+- Custom Wazuh rules
+- Analyst approval mode
+- Slack/email/SIEM notification after quarantine
+- Additional evidence collection
+- Process-context enrichment
+- YARA scanning
+- Automated case creation
+- MITRE ATT&CK mapping
+- Hash reputation caching
+- RPM-based Linux support
+- Formal detection-validation test cases
+
+---
+
+# SOC Workflow Demonstrated
+
+This project demonstrates an end-to-end defensive workflow:
+
+```text
+Monitor
+   ↓
+Detect
+   ↓
+Enrich
+   ↓
+Validate
+   ↓
+Contain
+   ↓
+Preserve Evidence
+   ↓
+Investigate
+   ↓
+Remediate
+```
+
+A key design principle of the project is:
+
+> **Automation should reduce response time without unnecessarily destroying evidence.**
+
+---
+
+## Disclaimer
+
+This project was developed for authorized defensive security testing, SOC training, detection engineering, and professional development.
+
+The EICAR file referenced in this repository is a harmless industry-standard anti-malware test file.
+
+Before deploying Active Response in a production environment, validate all detection and containment logic in a controlled environment and ensure that monitoring paths, rule IDs, permissions, and response thresholds are appropriate for the organization.
